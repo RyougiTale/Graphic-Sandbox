@@ -6,14 +6,12 @@ for performance test
 cmake --build build && .\build\bin\GraphicSandbox.exe
 ```
 
-## compile Debug
+## compile (Debug)
 ```bash
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
-cmake --build build
 ```
 
-## compile Release
+## compile (Release)
 ```bash
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build
 ```

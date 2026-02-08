@@ -1,5 +1,8 @@
 #pragma once
 #include <Core/Window.h>
+#include "Util/Timer.h"
+#include "Graphics/Renderer.h"
+#include "ImGui/ImGuiLayer.h"
 
 class Application
 {
@@ -14,5 +17,11 @@ private:
     void MainLoop();
     void ShutDown();
 
-    Window m_window;
+    
+    Window m_Window;
+    Timer m_Timer;
+    Renderer m_Renderer;
+    ImGuiLayer m_ImGui;
+
+    bool m_Running = true;
 };

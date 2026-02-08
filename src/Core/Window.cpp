@@ -118,27 +118,27 @@ Window::~Window()
 // close事件检测
 bool Window::ShouldClose() const
 {
-    LOG_DEBUG("ShouldClose");
+    // LOG_DEBUG("ShouldClose");
     return glfwWindowShouldClose(m_Window);
 }
 
 // events poll
 void Window::PollEvents()
 {
-    LOG_DEBUG("PollEvents");
+    // LOG_DEBUG("PollEvents");
     glfwPollEvents();
 }
 
 // 交换前后缓冲区
 void Window::SwapBuffers()
 {
-    LOG_DEBUG("SwapBuffers");
+    // LOG_DEBUG("SwapBuffers");
     glfwSwapBuffers(m_Window);
 }
 
 bool Window::IsKeyPressed(int key) const
 {
-    LOG_DEBUG("IsKeyPressed");
+    // LOG_DEBUG("IsKeyPressed");
     return glfwGetKey(m_Window, key) == GLFW_PRESS;
 }
 
