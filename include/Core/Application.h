@@ -3,6 +3,8 @@
 #include "Util/Timer.h"
 #include "Graphics/Renderer.h"
 #include "ImGui/ImGuiLayer.h"
+#include "ImGui/PerformancePanel.h"
+#include "Camera/FlyCamera.h"
 
 class Application
 {
@@ -22,6 +24,8 @@ private:
     Timer m_Timer;
     Renderer m_Renderer;
     ImGuiLayer m_ImGui;
+    PerformancePanel m_PerfPanel;
+    FlyCamera m_Camera;
 
     bool m_Running = true;
 };

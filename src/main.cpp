@@ -3,7 +3,6 @@
 
 int main() {
     try {
-        // Pass 0, 0 to auto-size window to 80% of screen
         Application app(0, 0, "Graphics Sandbox");
         app.Run();
     } catch (const std::exception& e) {

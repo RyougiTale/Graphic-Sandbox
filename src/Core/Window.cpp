@@ -61,8 +61,8 @@ Window::Window(int width, int height, const std::string &title)
     // 默认
     if (width <= 0 || height <= 0)
     {
-        m_Width = static_cast<int>(workW * 0.70f);
-        m_Height = static_cast<int>(workH * 0.70f);
+        m_Width = static_cast<int>(workW * 0.80f);
+        m_Height = static_cast<int>(workH * 0.80f);
     }
 
     m_Window = glfwCreateWindow(m_Width, m_Height, title.c_str(), nullptr, nullptr);

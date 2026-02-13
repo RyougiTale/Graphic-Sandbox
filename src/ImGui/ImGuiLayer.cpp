@@ -43,12 +43,12 @@ void ImGuiLayer::Init(GLFWwindow* window, float contentScale) {
     style.ScrollbarRounding = 2.0f; // 滚动条圆角
     style.ScaleAllSizes(contentScale);
 
-    // 后端初始化绑定glfw
-    // 注册键盘, 鼠标回调
+    // 后端初始化绑定glfw, 这里的opengl只是为了glfw内部调用flag
+    // 输出处理: 注册键盘, 鼠标回调
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     // imgui内部shader版本声明
     // 后端初始化绑定到opengl
-    // 创建imgui渲染用的shader buffer等
+    // 渲染: 创建imgui渲染用的shader buffer等
     ImGui_ImplOpenGL3_Init("#version 460");
 }
 
@@ -71,6 +71,21 @@ void ImGuiLayer::EndFrame()
 {
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+    // 当 ViewportsEnable 开启时，ImGui 的 GLFW 后端会在内部创建和管理额外的 GLFW 窗口
+    // viewports处理
+    ImGuiIO &io = ImGui::GetIO();
+    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+    {
+        // 保存当前上下文
+        GLFWwindow *backup_current_context = glfwGetCurrentContext();
+        // 创建/销毁/调整viewports窗口
+        ImGui::UpdatePlatformWindows();
+        // for 每个窗口: 切上下文+渲染
+        ImGui::RenderPlatformWindowsDefault();
+        // 切回来
+        glfwMakeContextCurrent(backup_current_context);
+    }
 }
 
 bool ImGuiLayer::WantCaptureMouse() const
