@@ -1,5 +1,6 @@
 #include "Graphics/ShaderHotReload.h"
 #include "Graphics/Shader.h"
+#include "Graphics/ComputeShader.h"
 #include <iostream>
 #include <chrono>
 #include <algorithm>
@@ -9,24 +10,50 @@ void ShaderHotReload::Watch(Shader *shader, ReloadCallback callback)
 {
     if (!shader)
         return;
-    WatchedShader watched;
-    watched.shader = shader;
-    watched.vertexLastWrite = GetFileTime(shader->GetVertexPath());
-    watched.fragmentLastWrite = GetFileTime(shader->GetFragmentPath());
-    watched.callback = callback;
+    WatchedEntry entry;
+    entry.shader = shader;
+    entry.callback = callback;
+    for (auto &[type, path] : shader->GetShaderPaths())
+    {
+        entry.fileTimestamps[path] = GetFileTime(path);
+    }
 
-    m_WatchedShaders.push_back(watched);
-    LOG_INFO("[HotReload] Watching: ", shader->GetVertexPath());
-    LOG_INFO("[HotReload] Watching: ", shader->GetFragmentPath());
+    m_WatchedEntries.push_back(entry);
+    LOG_INFO("[HotReload] watching shaders");
+    // LOG_INFO("[HotReload] Watching: ", shader->GetVertexPath());
+    // LOG_INFO("[HotReload] Watching: ", shader->GetFragmentPath());
+}
+
+void ShaderHotReload::Watch(ComputeShader *shader, ReloadCallback callback)
+{
+    if (!shader)
+        return;
+
+    WatchedEntry entry;
+    entry.computeShader = shader;
+    entry.callback = callback;
+    entry.fileTimestamps[shader->GetComputePath()] = GetFileTime(shader->GetComputePath());
+
+    m_WatchedEntries.push_back(std::move(entry));
+
+    std::cout << "[HotReload] Watching Compute Shaders: " << shader->GetComputePath() << std::endl;
 }
 
 void ShaderHotReload::Unwatch(Shader *shader)
 {
-    // 改成erase if
-    auto it = std::remove_if(m_WatchedShaders.begin(), m_WatchedShaders.end(),
-                             [shader](const WatchedShader &w)
-                             { return w.shader == shader; });
-    m_WatchedShaders.erase(it, m_WatchedShaders.end());
+    // todo 改成erase_if
+    auto it = std::remove_if(m_WatchedEntries.begin(), m_WatchedEntries.end(),
+                             [shader](const WatchedEntry &e)
+                             { return e.shader == shader; });
+    m_WatchedEntries.erase(it, m_WatchedEntries.end());
+}
+
+void ShaderHotReload::Unwatch(ComputeShader *shader)
+{
+    auto it = std::remove_if(m_WatchedEntries.begin(), m_WatchedEntries.end(),
+                             [shader](const WatchedEntry &e)
+                             { return e.computeShader == shader; });
+    m_WatchedEntries.erase(it, m_WatchedEntries.end());
 }
 
 void ShaderHotReload::Update()
@@ -39,15 +66,26 @@ void ShaderHotReload::Update()
         return;
     }
     lastCheck = now;
-    for (auto &watched : m_WatchedShaders)
+    for (auto &entry : m_WatchedEntries)
     {
-        if (HasFileChanged(watched))
+        if (HasFileChanged(entry))
         {
             LOG_INFO("[HotReload] file changed, reloading");
-            bool success = watched.shader->Reload();
-            if (watched.callback)
+            bool success = false;
+            std::string error;
+            if (entry.shader)
             {
-                watched.callback(watched.shader, success, watched.shader->GetLastError());
+                success = entry.shader->Reload();
+                error = entry.shader->GetLastError();
+            }
+            else if (entry.computeShader)
+            {
+                success = entry.computeShader->Reload();
+                error = entry.computeShader->GetLastError();
+            }
+            if (entry.callback)
+            {
+                entry.callback(success, error);
             }
             if (success)
             {
@@ -55,11 +93,10 @@ void ShaderHotReload::Update()
             }
             else
             {
-                LOG_INFO("[HotReload] hot reload fail: ", watched.shader->GetLastError());
+                LOG_INFO("[HotReload] hot reload fail: ", error);
             }
 
-            watched.vertexLastWrite = GetFileTime(watched.shader->GetVertexPath());
-            watched.fragmentLastWrite = GetFileTime(watched.shader->GetFragmentPath());
+            UpdateTimestamps(entry);
         }
     }
 }
@@ -79,10 +116,22 @@ std::filesystem::file_time_type ShaderHotReload::GetFileTime(const std::string &
     return std::filesystem::file_time_type{};
 }
 
-bool ShaderHotReload::HasFileChanged(WatchedShader &watched)
+bool ShaderHotReload::HasFileChanged(WatchedEntry &entry)
 {
-    auto vertexTime = GetFileTime(watched.shader->GetVertexPath());
-    auto fragmentTime = GetFileTime(watched.shader->GetFragmentPath());
+    for (auto &[path, lastTime] : entry.fileTimestamps)
+    {
+        if (GetFileTime(path) != lastTime)
+        {
+            return true;
+        }
+    }
+    return false;
+}
 
-    return vertexTime != watched.vertexLastWrite || fragmentTime != watched.fragmentLastWrite;
+void ShaderHotReload::UpdateTimestamps(WatchedEntry &entry)
+{
+    for (auto &[path, lastTime] : entry.fileTimestamps)
+    {
+        lastTime = GetFileTime(path);
+    }
 }

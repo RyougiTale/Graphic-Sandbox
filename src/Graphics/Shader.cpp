@@ -14,8 +14,7 @@ Shader::~Shader()
 
 Shader::Shader(Shader &&other) noexcept
     : m_Program(other.m_Program),
-      m_VertexPath(std::move(other.m_VertexPath)),
-      m_FragmentPath(std::move(other.m_FragmentPath)),
+      m_ShaderPaths(std::move(other.m_ShaderPaths)),
       m_LastError(std::move(other.m_LastError)),
       m_UniformCache(std::move(other.m_UniformCache))
 {
@@ -31,8 +30,7 @@ Shader &Shader::operator=(Shader &&other) noexcept
             glDeleteProgram(m_Program);
         }
         m_Program = other.m_Program;
-        m_VertexPath = std::move(other.m_VertexPath);
-        m_FragmentPath = std::move(other.m_FragmentPath);
+        m_ShaderPaths = std::move(other.m_ShaderPaths);
         m_LastError = std::move(other.m_LastError);
         m_UniformCache = std::move(other.m_UniformCache);
         other.m_Program = 0;
@@ -42,8 +40,19 @@ Shader &Shader::operator=(Shader &&other) noexcept
 
 bool Shader::LoadFromFiles(const std::string &vertexPath, const std::string &fragmentPath)
 {
-    m_VertexPath = vertexPath;
-    m_FragmentPath = fragmentPath;
+    m_ShaderPaths.clear();
+    m_ShaderPaths[GL_VERTEX_SHADER] = vertexPath;
+    m_ShaderPaths[GL_FRAGMENT_SHADER] = fragmentPath;
+    return Reload();
+}
+
+bool Shader::LoadFromFiles(std::initializer_list<std::pair<GLenum, std::string>> stages)
+{
+    m_ShaderPaths.clear();
+    for (auto &[type, path] : stages)
+    {
+        m_ShaderPaths[type] = path;
+    }
     return Reload();
 }
 
@@ -52,41 +61,37 @@ bool Shader::Reload()
     m_LastError.clear();
     m_UniformCache.clear();
 
-    std::string vertexSource = ReadFile(m_VertexPath);
-    if (vertexSource.empty())
+    std::vector<GLuint> compiledShaders;
+
+    for (auto &[type, path] : m_ShaderPaths)
     {
-        m_LastError = "Failed to read vertex shader: " + m_VertexPath;
-        LOG_WARN(m_LastError);
-        return false;
-    }
-    std::string fragmentSource = ReadFile(m_FragmentPath);
-    if (fragmentSource.empty())
-    {
-        m_LastError = "Failed to read fragment shader: " + m_FragmentPath;
-        LOG_WARN(m_LastError);
-        return false;
-    }
-    // compile
-    GLuint vertexShader = CompileShader(GL_VERTEX_SHADER, vertexSource, m_LastError);
-    if (!vertexShader)
-    {
-        m_LastError = "Vertex shader error:\n" + m_LastError;
-        LOG_WARN(m_LastError);
-        return false;
+        std::string source = ReadFile(path);
+        if (source.empty())
+        {
+            m_LastError = "Failed to read " + std::string(ShaderTypeName(type)) + " shader: " + path;
+            LOG_WARN(m_LastError);
+            for (GLuint s : compiledShaders)
+                glDeleteShader(s);
+            return false;
+        }
+
+        GLuint shader = CompileShader(type, source, m_LastError);
+        if (!shader)
+        {
+            m_LastError = std::string(ShaderTypeName(type)) + " shader error:\n" + m_LastError;
+            LOG_WARN(m_LastError);
+            for (GLuint s : compiledShaders)
+                glDeleteShader(s);
+            return false;
+        }
+
+        compiledShaders.push_back(shader);
     }
 
-    GLuint fragmentShader = CompileShader(GL_FRAGMENT_SHADER, fragmentSource, m_LastError);
-    if (!fragmentShader)
-    {
-        glDeleteShader(vertexShader);
-        m_LastError = "Fragment shader error:\n" + m_LastError;
-        LOG_WARN(m_LastError);
-        return false;
-    }
-    // link
-    GLuint newProgram = LinkProgram(vertexShader, fragmentShader, m_LastError);
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
+    GLuint newProgram = LinkProgram(compiledShaders, m_LastError);
+    for (GLuint s : compiledShaders)
+        glDeleteShader(s);
+
     if (!newProgram)
     {
         m_LastError = "Linking error:\n" + m_LastError;
@@ -100,7 +105,10 @@ bool Shader::Reload()
     }
     m_Program = newProgram;
 
-    LOG_INFO("[Shader] Loaded: ", m_VertexPath, ", ", m_FragmentPath);
+    for (auto &[type, path] : m_ShaderPaths)
+    {
+        LOG_INFO("[Shader] Loaded: ", path);
+    }
     return true;
 }
 
@@ -191,11 +199,13 @@ GLuint Shader::CompileShader(GLenum type, const std::string &source, std::string
     return shader;
 }
 
-GLuint Shader::LinkProgram(GLuint vertex, GLuint fragment, std::string &errorOut)
+GLuint Shader::LinkProgram(const std::vector<GLuint> &shaders, std::string &errorOut)
 {
     GLuint program = glCreateProgram();
-    glAttachShader(program, vertex);
-    glAttachShader(program, fragment);
+    for (GLuint shader : shaders)
+    {
+        glAttachShader(program, shader);
+    }
     glLinkProgram(program);
 
     GLint success;
@@ -211,4 +221,25 @@ GLuint Shader::LinkProgram(GLuint vertex, GLuint fragment, std::string &errorOut
     }
 
     return program;
+}
+
+const char *Shader::ShaderTypeName(GLenum type)
+{
+    switch (type)
+    {
+    case GL_VERTEX_SHADER:
+        return "Vertex";
+    case GL_FRAGMENT_SHADER:
+        return "Fragment";
+    case GL_GEOMETRY_SHADER:
+        return "Geometry";
+    case GL_TESS_CONTROL_SHADER:
+        return "Tessellation Control";
+    case GL_TESS_EVALUATION_SHADER:
+        return "Tessellation Evaluation";
+    case GL_COMPUTE_SHADER:
+        return "Compute";
+    default:
+        return "Unknown";
+    }
 }

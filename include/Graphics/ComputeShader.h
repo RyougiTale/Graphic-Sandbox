@@ -4,33 +4,28 @@
 #include <glm/glm.hpp>
 #include <string>
 #include <unordered_map>
-#include <initializer_list>
-#include <utility>
-#include <vector>
 
-class Shader
+class ComputeShader
 {
 public:
-    Shader() = default;
-    ~Shader();
+    ComputeShader() = default;
+    ~ComputeShader();
 
-    Shader(const Shader &) = delete;
-    Shader &operator=(const Shader &) = delete;
-    Shader(Shader &&other) noexcept;
-    Shader &operator=(Shader &&other) noexcept;
+    ComputeShader(const ComputeShader &) = delete;
+    ComputeShader &operator=(const ComputeShader &) = delete;
+    ComputeShader(ComputeShader &&other) noexcept;
+    ComputeShader &operator=(ComputeShader &&other) noexcept;
 
-    bool LoadFromFiles(const std::string &vertexPath, const std::string &fragmentPath);
-    // 复杂shader
-    bool LoadFromFiles(std::initializer_list<std::pair<GLenum, std::string>> stages);
-
+    bool LoadFromFile(const std::string &computePath);
     bool Reload();
 
     void Use() const;
+    void Dispatch(GLuint numGroupsX, GLuint numGroupsY = 1, GLuint numGroupsZ = 1) const;
     GLuint GetProgram() const { return m_Program; }
     bool IsValid() const { return m_Program != 0; }
 
+    const std::string &GetComputePath() const { return m_ComputePath; }
     const std::string &GetLastError() const { return m_LastError; }
-    const std::unordered_map<GLenum, std::string> &GetShaderPaths() const { return m_ShaderPaths; }
 
     // Uniform setters
     void SetInt(const std::string &name, int value);
@@ -44,13 +39,9 @@ public:
 private:
     GLint GetUniformLocation(const std::string &name);
     static std::string ReadFile(const std::string &path);
-    static GLuint CompileShader(GLenum type, const std::string &source, std::string &errorOut);
-    // static GLuint LinkProgram(GLuint vertex, GLuint fragment, std::string &errorOut);
-    static GLuint LinkProgram(const std::vector<GLuint> &shaders, std::string &errorOut);
-    static const char *ShaderTypeName(GLenum type);
 
     GLuint m_Program = 0;
-    std::unordered_map<GLenum, std::string> m_ShaderPaths;
+    std::string m_ComputePath;
     std::string m_LastError;
     std::unordered_map<std::string, GLint> m_UniformCache;
 };
