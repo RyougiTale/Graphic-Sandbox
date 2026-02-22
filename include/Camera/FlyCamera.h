@@ -1,20 +1,21 @@
 #pragma once
 
+#include "ICamera.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 class Window;
 // 第一人称camera
-class FlyCamera
+class FlyCamera : public ICamera
 {
 public:
     FlyCamera();
 
     void Update(float deltaTime, Window &window);
     void OnScroll(double yoffset);
-    void RenderImGui();
-    glm::mat4 GetViewMatrix() const;
-    glm::mat4 GetProjectionMatrix(float aspectRatio) const;
+    glm::mat4 GetViewMatrix() const override;
+    glm::mat4 GetProjectionMatrix(float aspectRatio) const override;
+    void RenderImGui() override;
 
     // 位置
     glm::vec3 position{0.0f, 2.0f, 5.0f};

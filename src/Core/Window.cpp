@@ -144,7 +144,7 @@ bool Window::IsKeyPressed(int key) const
 
 bool Window::IsMouseButtonPressed(int button) const
 {
-    LOG_DEBUG("IsMouseButtonPressed");
+    // LOG_DEBUG("IsMouseButtonPressed");
     return glfwGetMouseButton(m_Window, button) == GLFW_PRESS;
 }
 

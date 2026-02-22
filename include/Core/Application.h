@@ -5,6 +5,8 @@
 #include "ImGui/ImGuiLayer.h"
 #include "ImGui/PerformancePanel.h"
 #include "Camera/FlyCamera.h"
+#include "Demo/DemoManager.h"
+#include "Graphics/ShaderHotReload.h"
 
 class Application
 {
@@ -19,13 +21,14 @@ private:
     void MainLoop();
     void ShutDown();
 
-    
     Window m_Window;
     Timer m_Timer;
     Renderer m_Renderer;
     ImGuiLayer m_ImGui;
     PerformancePanel m_PerfPanel;
     FlyCamera m_Camera;
+    DemoManager m_DemoManager;
+    ShaderHotReload m_ShaderHotReload;
 
     bool m_Running = true;
 };
