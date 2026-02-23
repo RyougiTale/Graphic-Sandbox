@@ -13,7 +13,7 @@ public:
     virtual void OnInit() = 0;
     virtual void OnDestroy() {}
     virtual void OnUpdate(float) {}
-    virtual void OnRender(const ICamera &) = 0;
+    virtual void OnRender(const ICamera &, float aspectRatio) = 0;
     virtual void OnImGui() {}
     virtual void OnResize(int, int) {}
 

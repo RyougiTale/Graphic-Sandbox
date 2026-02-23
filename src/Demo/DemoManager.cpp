@@ -90,11 +90,11 @@ void DemoManager::Update(float deltaTime)
     }
 }
 
-void DemoManager::Render(const ICamera &camera)
+void DemoManager::Render(const ICamera &camera, float aspectRatio)
 {
     if (m_CurrentDemo)
     {
-        m_CurrentDemo->OnRender(camera);
+        m_CurrentDemo->OnRender(camera, aspectRatio);
     }
 }
 

@@ -37,7 +37,7 @@ void ComputeDemo::OnUpdate(float deltaTime)
 }
 
 // OnRender — compute shader 写 texture → memory barrier → display shader 画全屏三角形
-void ComputeDemo::OnRender(const ICamera &)
+void ComputeDemo::OnRender(const ICamera &, float /*aspectRatio*/)
 {
     // Step 1: Compute shader writes to texture
     if (m_ComputeShader.IsValid())

@@ -4,12 +4,14 @@
 #include <numeric>
 #include <algorithm>
 
-void PerformancePanel::Update(float deltaTime, float gpuTimeMs)
+void PerformancePanel::Update(float deltaTime, float gpuTimeMs, int windowWidth, int windowHeight)
 {
     // 秒转到毫秒
     m_FrameTimeMs = deltaTime * 1000.0f;
     m_GPUTimeMs = gpuTimeMs;
     m_FPS = deltaTime > 0.0f ? 1.0f / deltaTime : 0.0f;
+    m_WindowWidth = windowWidth;
+    m_WindowHeight = windowHeight;
 
     m_FrameTimeHistory.push_back(m_FrameTimeMs);
     m_GPUTimeHistory.push_back(m_GPUTimeMs);
@@ -46,6 +48,8 @@ void PerformancePanel::Render()
     ImGui::Text("FPS: %.1f", m_FPS);
     ImGui::Text("Frame Time: %.2f ms (avg: %.2f ms)", m_FrameTimeMs, m_AvgFrameTime);
     ImGui::Text("GPU Time: %.2f ms (avg: %.2f ms)", m_GPUTimeMs, m_AvgGPUTime);
+    ImGui::Text("Viewport: %dx%d (%.2f)", m_WindowWidth, m_WindowHeight,
+                m_WindowHeight > 0 ? static_cast<float>(m_WindowWidth) / static_cast<float>(m_WindowHeight) : 0.0f);
 
     ImGui::Separator();
 

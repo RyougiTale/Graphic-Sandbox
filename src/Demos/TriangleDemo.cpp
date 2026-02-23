@@ -73,7 +73,7 @@ void TriangleDemo::OnUpdate(float deltaTime)
     m_Rotation += m_RotationSpeed * deltaTime;
 }
 
-void TriangleDemo::OnRender(const ICamera &camera)
+void TriangleDemo::OnRender(const ICamera &camera, float aspectRatio)
 {
     if (!m_Shader.IsValid())
         return;
@@ -91,7 +91,7 @@ void TriangleDemo::OnRender(const ICamera &camera)
     // 内部调用glUniformMatrix4fv / glUniform3f
     m_Shader.SetMat4("u_Model", model);
     m_Shader.SetMat4("u_View", camera.GetViewMatrix());
-    m_Shader.SetMat4("u_Projection", camera.GetProjectionMatrix(16.0f / 9.0f)); // TODO: proper aspect
+    m_Shader.SetMat4("u_Projection", camera.GetProjectionMatrix(aspectRatio));
     m_Shader.SetVec3("u_TintColor", glm::vec3(m_Color[0], m_Color[1], m_Color[2]));
 
     // 激活之前配置好的 VAO，GPU 就知道从哪个 VBO 读、按什么布局解析

@@ -75,13 +75,14 @@ void Application::MainLoop()
     // render干活
     // gpuTimeMs GPU实际干活时间
     m_Renderer.BeginGPUTimer();
-    m_DemoManager.Render(m_Camera);
-    m_DebugDraw.Render(m_Camera, 16.0f / 9.0f);
+    float aspectRatio = m_Window.GetAspectRatio();
+    m_DemoManager.Render(m_Camera, aspectRatio);
+    m_DebugDraw.Render(m_Camera, aspectRatio);
     m_Renderer.EndGPUTimer();
 
     // imgui 部分
     m_ImGui.BeginFrame();
-    m_PerfPanel.Update(delta, m_Renderer.GetGPUTimeMs());
+    m_PerfPanel.Update(delta, m_Renderer.GetGPUTimeMs(), m_Window.GetWidth(), m_Window.GetHeight());
     m_PerfPanel.Render();
     m_Camera.RenderImGui();
     m_DemoManager.RenderImGui();

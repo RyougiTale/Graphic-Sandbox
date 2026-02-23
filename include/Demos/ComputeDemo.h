@@ -10,7 +10,7 @@ public:
     void OnInit() override;
     void OnDestroy() override;
     void OnUpdate(float deltaTime) override;
-    void OnRender(const ICamera& camera) override;
+    void OnRender(const ICamera& camera, float aspectRatio) override;
     void OnImGui() override;
     void OnResize(int width, int height) override;
     void RegisterShaders(ShaderHotReload& hotReload) override;

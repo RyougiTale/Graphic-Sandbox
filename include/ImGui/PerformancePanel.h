@@ -6,7 +6,7 @@
 class PerformancePanel
 {
 public:
-    void Update(float deltaTime, float gpuTimeMs);
+    void Update(float deltaTime, float gpuTimeMs, int windowWidth, int windowHeight);
     void Render();
 
     std::string shaderError;
@@ -23,4 +23,7 @@ private:
 
     float m_AvgFrameTime = 0.0f;
     float m_AvgGPUTime = 0.0f;
+
+    int m_WindowWidth = 0;
+    int m_WindowHeight = 0;
 };

@@ -30,7 +30,7 @@ public:
     void SwitchTo(int index);
 
     void Update(float deltaTime);
-    void Render(const ICamera &camera);
+    void Render(const ICamera &camera, float aspectRatio);
     void RenderImGui();
     void OnResize(int width, int height);
 
