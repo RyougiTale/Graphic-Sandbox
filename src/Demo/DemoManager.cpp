@@ -101,7 +101,7 @@ void DemoManager::Render(const ICamera &camera)
 void DemoManager::RenderImGui()
 {
     ImGui::SetNextWindowSize(ImVec2(800, 350), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowPos(ImVec2(20, 715), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2(20, 760), ImGuiCond_FirstUseEver);
     ImGui::Begin("Demos");
 
     // Demo selector

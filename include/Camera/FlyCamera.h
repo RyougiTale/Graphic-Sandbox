@@ -18,7 +18,7 @@ public:
     void RenderImGui() override;
 
     // 位置
-    glm::vec3 position{0.0f, 2.0f, 5.0f};
+    glm::vec3 position{0.0f, 0.0f, 5.0f};
     // 飞行器术语
     // Pitch: 俯仰, 绕X轴, 值从-89到89, 0表示平视
     // Yaw: 偏航, 绕Y轴, 值从-180到180， 0表示看向X(标准三角函数单位元), -90看向-Z

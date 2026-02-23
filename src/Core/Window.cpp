@@ -150,7 +150,7 @@ bool Window::IsMouseButtonPressed(int button) const
 
 void Window::GetCursorPos(double &x, double &y) const
 {
-    LOG_DEBUG("GetCursorPos");
+    // LOG_DEBUG("GetCursorPos");
     glfwGetCursorPos(m_Window, &x, &y);
 }
 
