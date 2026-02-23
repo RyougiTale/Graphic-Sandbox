@@ -7,6 +7,7 @@
 #include "Camera/FlyCamera.h"
 #include "Demo/DemoManager.h"
 #include "Graphics/ShaderHotReload.h"
+#include "Graphics/DebugDraw.h"
 
 class Application
 {
@@ -29,6 +30,7 @@ private:
     FlyCamera m_Camera;
     DemoManager m_DemoManager;
     ShaderHotReload m_ShaderHotReload;
+    DebugDraw m_DebugDraw;
 
     bool m_Running = true;
 };

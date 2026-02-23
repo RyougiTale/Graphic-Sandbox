@@ -41,6 +41,8 @@ void Application::Init()
     LOG_INFO("register demos end");
     m_DemoManager.Init(m_ShaderHotReload);
     LOG_INFO("demo manager init end");
+
+    m_DebugDraw.Init();
 }
 
 void Application::MainLoop()
@@ -74,6 +76,7 @@ void Application::MainLoop()
     // gpuTimeMs GPU实际干活时间
     m_Renderer.BeginGPUTimer();
     m_DemoManager.Render(m_Camera);
+    m_DebugDraw.Render(m_Camera, 16.0f / 9.0f);
     m_Renderer.EndGPUTimer();
 
     // imgui 部分
@@ -82,6 +85,7 @@ void Application::MainLoop()
     m_PerfPanel.Render();
     m_Camera.RenderImGui();
     m_DemoManager.RenderImGui();
+    m_DebugDraw.RenderImGui();
 
     m_ImGui.EndFrame();
     // 全屏模式可以绕过Desktop Window Manager直接输出到显示器
@@ -91,6 +95,7 @@ void Application::MainLoop()
 
 void Application::ShutDown()
 {
+    m_DebugDraw.Shutdown();
     m_DemoManager.Shutdown();
     m_ImGui.Shutdown();
 }
