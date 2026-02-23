@@ -50,6 +50,11 @@ void PerformancePanel::Render()
     ImGui::Text("GPU Time: %.2f ms (avg: %.2f ms)", m_GPUTimeMs, m_AvgGPUTime);
     ImGui::Text("Viewport: %dx%d (%.2f)", m_WindowWidth, m_WindowHeight,
                 m_WindowHeight > 0 ? static_cast<float>(m_WindowWidth) / static_cast<float>(m_WindowHeight) : 0.0f);
+    ImGui::Checkbox("Override Aspect Ratio", &overrideAspectRatio);
+    if (overrideAspectRatio)
+    {
+        ImGui::SliderFloat("Aspect Ratio", &customAspectRatio, 0.2f, 5.0f);
+    }
 
     ImGui::Separator();
 

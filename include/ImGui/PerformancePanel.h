@@ -12,6 +12,9 @@ public:
     std::string shaderError;
     std::string shaderStatus = "OK";
 
+    bool overrideAspectRatio = false;
+    float customAspectRatio = 1.78f;
+
 private:
     static constexpr int HISTORY_SIZE = 120;
 

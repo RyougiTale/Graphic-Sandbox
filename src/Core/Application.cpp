@@ -75,7 +75,9 @@ void Application::MainLoop()
     // render干活
     // gpuTimeMs GPU实际干活时间
     m_Renderer.BeginGPUTimer();
-    float aspectRatio = m_Window.GetAspectRatio();
+    float aspectRatio = m_PerfPanel.overrideAspectRatio
+                            ? m_PerfPanel.customAspectRatio
+                            : m_Window.GetAspectRatio();
     m_DemoManager.Render(m_Camera, aspectRatio);
     m_DebugDraw.Render(m_Camera, aspectRatio);
     m_Renderer.EndGPUTimer();
