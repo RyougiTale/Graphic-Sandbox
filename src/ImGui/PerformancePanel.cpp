@@ -40,9 +40,8 @@ void PerformancePanel::Update(float deltaTime, float gpuTimeMs, int windowWidth,
 void PerformancePanel::Render()
 {
     // 初始化窗口
-    ImGui::SetNextWindowSize(ImVec2(735, 332), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiCond_FirstUseEver);
-    ImGui::Begin("Performance");
+    ImGui::Begin("Performance", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
     // FPS and frame time
     ImGui::Text("FPS: %.1f", m_FPS);

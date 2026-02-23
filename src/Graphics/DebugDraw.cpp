@@ -65,9 +65,8 @@ void DebugDraw::Render(const ICamera &camera, float aspectRatio)
 
 void DebugDraw::RenderImGui()
 {
-    ImGui::SetNextWindowSize(ImVec2(700, 300), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowPos(ImVec2(1330, 20), ImGuiCond_FirstUseEver);
-    ImGui::Begin("Scene");
+    ImGui::Begin("Scene", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
     ImGui::Checkbox("Show Axes", &m_ShowAxes);
     ImGui::Checkbox("Show Grid", &m_ShowGrid);

@@ -100,9 +100,8 @@ void DemoManager::Render(const ICamera &camera, float aspectRatio)
 
 void DemoManager::RenderImGui()
 {
-    ImGui::SetNextWindowSize(ImVec2(800, 350), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowPos(ImVec2(20, 760), ImGuiCond_FirstUseEver);
-    ImGui::Begin("Demos");
+    ImGui::Begin("Demos", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
     // Demo selector
     if (ImGui::BeginCombo("Select Demo", m_CurrentIndex >= 0 ? m_DemoNames[m_CurrentIndex].c_str() : "None"))

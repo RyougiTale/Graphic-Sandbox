@@ -114,9 +114,8 @@ glm::mat4 FlyCamera::GetProjectionMatrix(float aspectRatio) const
 
 void FlyCamera::RenderImGui()
 {
-    ImGui::SetNextWindowSize(ImVec2(850, 360), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowPos(ImVec2(20, 375), ImGuiCond_FirstUseEver);
-    ImGui::Begin("Camera");
+    ImGui::Begin("Camera", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
     ImGui::DragFloat3("Position", &position.x, 0.1f);
     bool changed = ImGui::SliderFloat("Yaw", &yaw, -180.0f, 180.0f);
     changed |= ImGui::SliderFloat("Pitch", &pitch, -89.0f, 89.0f);
@@ -131,7 +130,7 @@ void FlyCamera::RenderImGui()
     ImGui::Separator();
     if (ImGui::Button("Reset"))
     {
-        position = glm::vec3(0.0f, 0.0f, 5.0f);
+        position = glm::vec3(0.0f, 2.0f, 5.0f);
         yaw = -90.0f;
         pitch = 0.0f;
         moveSpeed = 15.0f;
