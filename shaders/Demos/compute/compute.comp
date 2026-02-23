@@ -1,0 +1,29 @@
+#version 460 core
+
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(rgba32f, binding = 0) uniform image2D u_OutputImage;
+
+uniform float u_Time;
+
+void main() {
+    ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 imageSize = imageSize(u_OutputImage);
+
+    if (pixelCoord.x >= imageSize.x || pixelCoord.y >= imageSize.y) return;
+
+    vec2 uv = vec2(pixelCoord) / vec2(imageSize);
+
+    // Animated wave pattern
+    float d = length(uv - 0.5);
+    float wave = sin(d * 20.0 - u_Time * 3.0) * 0.5 + 0.5;
+
+    vec3 color1 = vec3(0.1, 0.4, 0.8);
+    vec3 color2 = vec3(0.9, 0.3, 0.1);
+    vec3 color = mix(color1, color2, wave);
+
+    // Add circular rings
+    float ring = smoothstep(0.02, 0.0, abs(fract(d * 8.0 - u_Time * 0.5) - 0.5));
+    color += ring * 0.3;
+
+    imageStore(u_OutputImage, pixelCoord, vec4(color, 1.0));
+}

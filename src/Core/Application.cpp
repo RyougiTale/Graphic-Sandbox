@@ -3,6 +3,7 @@
 #include <GLFW/glfw3.h>
 #include "Util/GLog.h"
 #include "Demos/TriangleDemo.h"
+#include "Demos/ComputeDemo.h"
 
 Application::Application(int width, int height, const char *title) : m_Window(width, height, title)
 {
@@ -25,7 +26,7 @@ void Application::Init()
         m_DemoManager.OnResize(w, h);
     };
 
-    m_Window.OnScroll = [this](double x, double y)
+    m_Window.OnScroll = [this](double, double y)
     {
         if (!m_ImGui.WantCaptureMouse())
         {
@@ -35,6 +36,7 @@ void Application::Init()
     LOG_INFO("register demos begin");
     // 注册demos
     m_DemoManager.Register<TriangleDemo>();
+    m_DemoManager.Register<ComputeDemo>();
     // 注册结束
     LOG_INFO("register demos end");
     m_DemoManager.Init(m_ShaderHotReload);
