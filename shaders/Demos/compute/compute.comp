@@ -1,29 +1,70 @@
 #version 460 core
 
+// 工作组大小: 每组 16x16 = 256 个线程, 每个线程负责一个像素
+// GPU 会同时启动成千上万个这样的工作组来并行处理整张图
 layout(local_size_x = 16, local_size_y = 16) in;
+// 输出纹理: rgba32f = 每通道32位浮点, binding = 0 对应 CPU 端 glBindImageTexture(0, ...)
+// image2D 和 sampler2D 不同: image2D 可读可写, sampler2D 只读
 layout(rgba32f, binding = 0) uniform image2D u_OutputImage;
 
+// CPU 每帧传入的时间, 用于动画
 uniform float u_Time;
 
 void main() {
+    // gl_GlobalInvocationID: 内置变量, 当前线程在全局网格中的坐标
+    // 比如工作组(2,3)中的本地线程(5,7) → 全局ID = (2*16+5, 3*16+7) = (37, 55)
+    // 每个线程的全局ID唯一, 正好对应一个像素坐标
     ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+    // 查询纹理实际尺寸(宽, 高)
     ivec2 imageSize = imageSize(u_OutputImage);
 
+    // 边界检查: dispatch 的工作组数量可能超出图像尺寸(向上取整导致)
+    // 比如图像 500x500, 工作组 16x16, 需要 dispatch 32x32 组 = 512x512 个线程
+    // 多出的 12 列/行线程需要提前退出, 否则会写到纹理外面
     if (pixelCoord.x >= imageSize.x || pixelCoord.y >= imageSize.y) return;
 
+    // 归一化坐标: 把像素坐标 (0~width, 0~height) 映射到 (0.0~1.0, 0.0~1.0)
+    // 这样计算不依赖具体分辨率
     vec2 uv = vec2(pixelCoord) / vec2(imageSize);
 
-    // Animated wave pattern
+    // ===== 动态波纹效果 =====
+
+    // d = 当前像素到画面中心(0.5, 0.5)的距离
+    // 中心 d=0, 四角 d≈0.707(√2/2)
     float d = length(uv - 0.5);
+
+    // sin 产生 -1~1 的周期波, *0.5+0.5 映射到 0~1
+    // d * 20.0: 距离越远, sin 的输入越大 → 产生同心圆环效果(20.0 控制环的密度)
+    // u_Time * 3.0: 时间偏移让波纹向外扩散(3.0 控制扩散速度)
     float wave = sin(d * 20.0 - u_Time * 3.0) * 0.5 + 0.5;
 
-    vec3 color1 = vec3(0.1, 0.4, 0.8);
-    vec3 color2 = vec3(0.9, 0.3, 0.1);
+    // 两个颜色: 蓝色和橙色
+    vec3 color1 = vec3(0.1, 0.4, 0.8);  // 蓝
+    vec3 color2 = vec3(0.9, 0.3, 0.1);  // 橙
+    // mix(a, b, t): 线性插值, t=0 返回 a, t=1 返回 b
+    // wave 在 0~1 之间振荡 → 颜色在蓝橙之间平滑过渡, 形成彩色同心波纹
+    // 线性插值
+    // mix(a, b, t) = a × (1-t) + b × t
     vec3 color = mix(color1, color2, wave);
 
-    // Add circular rings
+    // ===== 叠加亮环 =====
+
+    // fract(x): 取小数部分, 值域 0~1, 周期性锯齿波
+    // fract(x) 取小数部分，每当 x 增加 1，fract 就走完一个 0→1 的周期
+    // d 从 0 到 ~0.707（中心到角落），d * 8.0 从 0 到 ~5.66，所以 fract 会归零约 5-6 次 → 5-6 个亮环。"8 段"是指如果 d 的范围能到 1.0 就有 8 段，实际可见范围内少几个。
+    // 如果改成 d * 16.0，环就会密一倍；d * 4.0，环就疏一倍。
+    // d * 8.0: 把距离分成 8 段(8 个环)
+    // - u_Time * 0.5: 环随时间移动(比主波纹慢)
+    // fract(...) - 0.5: 值域变为 -0.5~0.5, 每段中心为 0
+    // abs(...): 值域 0~0.5, 每段中心为 0、边缘为 0.5 的三角波
+    // smoothstep(0.02, 0.0, x): 当 x < 0.0 返回 1, x > 0.02 返回 0, 中间平滑过渡
+    // 只有 abs 值非常接近 0 的地方(即每段的中心线)才亮 → 形成细亮环
+    // float ring = smoothstep(0.02, 0.0, abs(fract(d * 8.0 - u_Time * 0.5) - 0.5));
     float ring = smoothstep(0.02, 0.0, abs(fract(d * 8.0 - u_Time * 0.5) - 0.5));
+    // 叠加亮环, 0.3 控制亮度
     color += ring * 0.3;
 
+    // 把计算结果写入纹理的对应像素
+    // 之后 fullscreen.frag 会通过 texture() 采样这张纹理显示到屏幕上
     imageStore(u_OutputImage, pixelCoord, vec4(color, 1.0));
 }

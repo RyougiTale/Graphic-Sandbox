@@ -72,6 +72,11 @@ void Application::MainLoop()
 
     // render流程
     m_Renderer.Clear(0.1f, 0.1f, 0.12f);
+    // 窗口最小化时宽高为0, aspectRatio为0会导致glm::perspective断言失败
+    if (m_Window.GetWidth() == 0 || m_Window.GetHeight() == 0)
+    {
+        return;
+    }
     // render干活
     // gpuTimeMs GPU实际干活时间
     m_Renderer.BeginGPUTimer();
