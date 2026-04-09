@@ -13,6 +13,7 @@ public:
 
     void Update(float deltaTime, Window &window);
     void OnScroll(double yoffset);
+    glm::vec3 GetPosition() const override { return position; }
     glm::mat4 GetViewMatrix() const override;
     glm::mat4 GetProjectionMatrix(float aspectRatio) const override;
     void RenderImGui() override;

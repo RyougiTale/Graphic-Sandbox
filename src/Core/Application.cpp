@@ -4,6 +4,7 @@
 #include "Util/GLog.h"
 #include "Demos/TriangleDemo.h"
 #include "Demos/ComputeDemo.h"
+#include "Demos/LatticeDemo.h"
 
 Application::Application(int width, int height, const char *title) : m_Window(width, height, title)
 {
@@ -37,6 +38,7 @@ void Application::Init()
     // 注册demos
     m_DemoManager.Register<TriangleDemo>();
     m_DemoManager.Register<ComputeDemo>();
+    m_DemoManager.Register<LatticeDemo>();
     // 注册结束
     LOG_INFO("register demos end");
     m_DemoManager.Init(m_ShaderHotReload);
