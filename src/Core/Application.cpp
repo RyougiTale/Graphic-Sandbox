@@ -7,6 +7,7 @@
 #include "Demos/LatticeDemo.h"
 #include "Demos/TPMSDemo.h"
 #include "Demos/SDFLatticeDemo.h"
+#include "Demos/VoronoiLatticeDemo.h"
 
 Application::Application(int width, int height, const char *title) : m_Window(width, height, title)
 {
@@ -43,6 +44,7 @@ void Application::Init()
     m_DemoManager.Register<LatticeDemo>();
     m_DemoManager.Register<TPMSDemo>();
     m_DemoManager.Register<SDFLatticeDemo>();
+    m_DemoManager.Register<VoronoiLatticeDemo>();
     // 注册结束
     LOG_INFO("register demos end");
     m_DemoManager.Init(m_ShaderHotReload);
