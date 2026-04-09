@@ -5,6 +5,8 @@
 #include "Demos/TriangleDemo.h"
 #include "Demos/ComputeDemo.h"
 #include "Demos/LatticeDemo.h"
+#include "Demos/TPMSDemo.h"
+#include "Demos/SDFLatticeDemo.h"
 
 Application::Application(int width, int height, const char *title) : m_Window(width, height, title)
 {
@@ -39,6 +41,8 @@ void Application::Init()
     m_DemoManager.Register<TriangleDemo>();
     m_DemoManager.Register<ComputeDemo>();
     m_DemoManager.Register<LatticeDemo>();
+    m_DemoManager.Register<TPMSDemo>();
+    m_DemoManager.Register<SDFLatticeDemo>();
     // 注册结束
     LOG_INFO("register demos end");
     m_DemoManager.Init(m_ShaderHotReload);
