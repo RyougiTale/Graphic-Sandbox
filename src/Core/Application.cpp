@@ -8,6 +8,12 @@
 #include "Demos/TPMSDemo.h"
 #include "Demos/SDFLatticeDemo.h"
 #include "Demos/VoronoiLatticeDemo.h"
+#include "Demos/VoronoiWireframeDemo.h"
+#include "Demos/VoronoiSpongeDemo.h"
+#include "Demos/MeshDualDemo.h"
+#include "Demos/MeshDualSmoothDemo.h"
+#include "Demos/HexMappingDemo.h"
+#include "Demos/HexCarvingDemo.h"
 
 Application::Application(int width, int height, const char *title) : m_Window(width, height, title)
 {
@@ -45,6 +51,12 @@ void Application::Init()
     m_DemoManager.Register<TPMSDemo>();
     m_DemoManager.Register<SDFLatticeDemo>();
     m_DemoManager.Register<VoronoiLatticeDemo>();
+    m_DemoManager.Register<VoronoiWireframeDemo>();
+    m_DemoManager.Register<VoronoiSpongeDemo>();
+    m_DemoManager.Register<MeshDualDemo>();
+    m_DemoManager.Register<MeshDualSmoothDemo>();
+    m_DemoManager.Register<HexMappingDemo>();
+    m_DemoManager.Register<HexCarvingDemo>();
     // 注册结束
     LOG_INFO("register demos end");
     m_DemoManager.Init(m_ShaderHotReload);
