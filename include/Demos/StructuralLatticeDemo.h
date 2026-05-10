@@ -2,9 +2,18 @@
 
 #include "Demo/DemoBase.h"
 #include "Graphics/Shader.h"
+#include "Geometry/MeshRenderer.h"
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <vector>
+
+enum class StructuralBuildMode
+{
+    GraphStruts,
+    VoronoiStruts,
+    TPMSSurface,
+    VoronoiFoam
+};
 
 // Structural lattice: unit cell + cell map + SDF domain + thickness field.
 enum class StructuralCellType
@@ -28,6 +37,12 @@ enum class StructuralFieldType
     BoundaryDense,
     VerticalGradient,
     CenterDense
+};
+
+enum class StructuralTPMSType
+{
+    Gyroid,
+    Diamond
 };
 
 class StructuralLatticeDemo : public DemoBase
@@ -64,6 +79,9 @@ private:
     void RebuildLattice();
     void UploadDomainWireframe();
     void UploadInstances();
+    void RebuildGraphLattice();
+    void RebuildVoronoiStruts();
+    void RebuildImplicitLattice();
 
     std::vector<CellEdge> BuildUnitCell() const;
     bool ClipSegmentToDomain(const glm::vec3 &p0, const glm::vec3 &p1,
@@ -71,8 +89,13 @@ private:
     float DomainSDF(const glm::vec3 &p) const;
     float RadiusAt(const glm::vec3 &p) const;
     float SoleHalfWidthAt(float x) const;
+    float TPMSField(const glm::vec3 &p) const;
+    float TPMSLatticeSDF(const glm::vec3 &p) const;
+    float VoronoiLatticeSDF(const glm::vec3 &p) const;
 
     Shader m_Shader;
+    Shader m_SurfaceShader;
+    MeshRenderer m_ImplicitMesh;
 
     GLuint m_SphereVBO = 0, m_SphereEBO = 0;
     GLuint m_CylVBO = 0, m_CylEBO = 0;
@@ -89,9 +112,11 @@ private:
     std::vector<InstanceData> m_JointInstances;
     std::vector<InstanceData> m_StrutInstances;
 
+    StructuralBuildMode m_BuildMode = StructuralBuildMode::GraphStruts;
     StructuralCellType m_CellType = StructuralCellType::Octet;
     StructuralDomainType m_DomainType = StructuralDomainType::ShoeSole;
     StructuralFieldType m_FieldType = StructuralFieldType::BoundaryDense;
+    StructuralTPMSType m_TPMSType = StructuralTPMSType::Gyroid;
 
     glm::vec3 m_DomainSize = glm::vec3(7.0f, 1.8f, 3.2f);
     float m_CellSize = 0.65f;
@@ -99,6 +124,13 @@ private:
     float m_JointScale = 1.35f;
     float m_FieldStrength = 0.75f;
     float m_FieldBand = 0.65f;
+    float m_TPMSThickness = 0.16f;
+    float m_TPMSIsoValue = 0.0f;
+    float m_VoronoiThickness = 0.12f;
+    float m_VoronoiJitter = 0.75f;
+    int m_VoronoiSeed = 42;
+    int m_VoronoiNeighborCount = 4;
+    int m_ImplicitResolution = 96;
 
     bool m_ShowStruts = true;
     bool m_ShowJoints = true;
@@ -116,4 +148,6 @@ private:
     int m_NumCells = 0;
     int m_NumUnitEdges = 0;
     int m_MaxStruts = 12000;
+    int m_ImplicitTriCount = 0;
+    int m_ImplicitVertCount = 0;
 };

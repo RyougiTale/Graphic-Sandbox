@@ -1,5 +1,6 @@
 #include "Demos/StructuralLatticeDemo.h"
 #include "Camera/ICamera.h"
+#include "Geometry/MarchingCubes.h"
 #include "Geometry/Primitives.h"
 #include "Graphics/ShaderHotReload.h"
 #include <glm/gtc/matrix_transform.hpp>
@@ -8,6 +9,7 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <set>
 
 static float smoothstep01(float x)
@@ -69,10 +71,42 @@ static std::array<int, 6> makeEdgeKey(const glm::vec3 &a, const glm::vec3 &b)
     return {qa[0], qa[1], qa[2], qb[0], qb[1], qb[2]};
 }
 
+static bool isStrutMode(StructuralBuildMode mode)
+{
+    return mode == StructuralBuildMode::GraphStruts ||
+           mode == StructuralBuildMode::VoronoiStruts;
+}
+
+static bool isImplicitMode(StructuralBuildMode mode)
+{
+    return mode == StructuralBuildMode::TPMSSurface ||
+           mode == StructuralBuildMode::VoronoiFoam;
+}
+
+static uint32_t pcgHash(uint32_t input)
+{
+    uint32_t state = input * 747796405u + 2891336453u;
+    uint32_t word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+static float hashFloat(int x, int y, int z, int seed, int channel)
+{
+    uint32_t combined =
+        static_cast<uint32_t>(x) * 374761393u +
+        static_cast<uint32_t>(y) * 668265263u +
+        static_cast<uint32_t>(z) * 1274126177u +
+        static_cast<uint32_t>(seed) * 1013904223u +
+        static_cast<uint32_t>(channel) * 1664525u;
+    return static_cast<float>(pcgHash(combined)) / static_cast<float>(0xFFFFFFFFu);
+}
+
 void StructuralLatticeDemo::OnInit()
 {
     m_Shader.LoadFromFiles("shaders/Demos/structural_lattice/structural.vert",
                            "shaders/Demos/structural_lattice/structural.frag");
+    m_SurfaceShader.LoadFromFiles("shaders/Demos/voronoi_sponge/sponge.vert",
+                                  "shaders/Demos/voronoi_sponge/sponge.frag");
 
     {
         std::vector<float> verts;
@@ -153,6 +187,7 @@ void StructuralLatticeDemo::OnDestroy()
     delBuf(m_SphereEBO);
     delBuf(m_CylVBO);
     delBuf(m_CylEBO);
+    m_ImplicitMesh.Destroy();
 }
 
 void StructuralLatticeDemo::OnUpdate(float deltaTime)
@@ -169,35 +204,55 @@ void StructuralLatticeDemo::OnUpdate(float deltaTime)
 
 void StructuralLatticeDemo::OnRender(const ICamera &camera, float aspectRatio)
 {
-    if (!m_Shader.IsValid())
-        return;
-
-    m_Shader.Use();
     glm::mat4 model = glm::rotate(glm::mat4(1.0f), m_RotAngle, glm::vec3(0.0f, 1.0f, 0.0f));
-    m_Shader.SetMat4("u_Model", model);
-    m_Shader.SetMat4("u_View", camera.GetViewMatrix());
-    m_Shader.SetMat4("u_Projection", camera.GetProjectionMatrix(aspectRatio));
-    m_Shader.SetVec3("u_LightDir", glm::normalize(glm::vec3(0.45f, 1.0f, 0.75f)));
-    m_Shader.SetVec3("u_ViewPos", camera.GetPosition());
 
     glEnable(GL_DEPTH_TEST);
 
-    if (m_ShowStruts && m_StrutCount > 0)
+    if (isStrutMode(m_BuildMode))
     {
-        m_Shader.SetInt("u_RenderMode", 1);
-        glBindVertexArray(m_StrutVAO);
-        glDrawElementsInstanced(GL_TRIANGLES, m_CylIndexCount, GL_UNSIGNED_INT, nullptr, m_StrutCount);
+        if (!m_Shader.IsValid())
+            return;
+
+        m_Shader.Use();
+        m_Shader.SetMat4("u_Model", model);
+        m_Shader.SetMat4("u_View", camera.GetViewMatrix());
+        m_Shader.SetMat4("u_Projection", camera.GetProjectionMatrix(aspectRatio));
+        m_Shader.SetVec3("u_LightDir", glm::normalize(glm::vec3(0.45f, 1.0f, 0.75f)));
+        m_Shader.SetVec3("u_ViewPos", camera.GetPosition());
+
+        if (m_ShowStruts && m_StrutCount > 0)
+        {
+            m_Shader.SetInt("u_RenderMode", 1);
+            glBindVertexArray(m_StrutVAO);
+            glDrawElementsInstanced(GL_TRIANGLES, m_CylIndexCount, GL_UNSIGNED_INT, nullptr, m_StrutCount);
+        }
+
+        if (m_ShowJoints && m_JointCount > 0)
+        {
+            m_Shader.SetInt("u_RenderMode", 0);
+            glBindVertexArray(m_JointVAO);
+            glDrawElementsInstanced(GL_TRIANGLES, m_SphereIndexCount, GL_UNSIGNED_INT, nullptr, m_JointCount);
+        }
+    }
+    else if (isImplicitMode(m_BuildMode) && m_SurfaceShader.IsValid() && m_ImplicitMesh.IsValid())
+    {
+        m_SurfaceShader.Use();
+        m_SurfaceShader.SetMat4("u_Model", model);
+        m_SurfaceShader.SetMat4("u_View", camera.GetViewMatrix());
+        m_SurfaceShader.SetMat4("u_Projection", camera.GetProjectionMatrix(aspectRatio));
+        m_SurfaceShader.SetVec3("u_LightDir", glm::normalize(glm::vec3(0.45f, 1.0f, 0.75f)));
+        m_SurfaceShader.SetVec3("u_ViewPos", camera.GetPosition());
+        m_SurfaceShader.SetVec3("u_Color", glm::vec3(m_StrutColor[0], m_StrutColor[1], m_StrutColor[2]));
+        m_SurfaceShader.SetVec3("u_BackColor", glm::vec3(m_JointColor[0], m_JointColor[1], m_JointColor[2]));
+        m_ImplicitMesh.Draw();
     }
 
-    if (m_ShowJoints && m_JointCount > 0)
+    if (m_ShowDomain && m_DomainVertCount > 0 && m_Shader.IsValid())
     {
-        m_Shader.SetInt("u_RenderMode", 0);
-        glBindVertexArray(m_JointVAO);
-        glDrawElementsInstanced(GL_TRIANGLES, m_SphereIndexCount, GL_UNSIGNED_INT, nullptr, m_JointCount);
-    }
-
-    if (m_ShowDomain && m_DomainVertCount > 0)
-    {
+        m_Shader.Use();
+        m_Shader.SetMat4("u_Model", model);
+        m_Shader.SetMat4("u_View", camera.GetViewMatrix());
+        m_Shader.SetMat4("u_Projection", camera.GetProjectionMatrix(aspectRatio));
         m_Shader.SetInt("u_RenderMode", 2);
         glBindVertexArray(m_DomainVAO);
         glDrawArrays(GL_LINES, 0, m_DomainVertCount);
@@ -208,12 +263,53 @@ void StructuralLatticeDemo::OnRender(const ICamera &camera, float aspectRatio)
 
 void StructuralLatticeDemo::OnImGui()
 {
+    const char *modeNames[] = {"Graph Struts", "Voronoi Struts", "TPMS Surface", "Voronoi Foam"};
+    int modeIdx = static_cast<int>(m_BuildMode);
+    if (ImGui::Combo("Structure Mode", &modeIdx, modeNames, IM_ARRAYSIZE(modeNames)))
+    {
+        m_BuildMode = static_cast<StructuralBuildMode>(modeIdx);
+        m_NeedRebuild = true;
+    }
+
     const char *cellNames[] = {"Cubic", "BCC", "Octet", "Diamond-like"};
     int cellIdx = static_cast<int>(m_CellType);
-    if (ImGui::Combo("Unit Cell", &cellIdx, cellNames, IM_ARRAYSIZE(cellNames)))
+    if (m_BuildMode == StructuralBuildMode::GraphStruts &&
+        ImGui::Combo("Graph Unit Cell", &cellIdx, cellNames, IM_ARRAYSIZE(cellNames)))
     {
         m_CellType = static_cast<StructuralCellType>(cellIdx);
         m_NeedRebuild = true;
+    }
+
+    if (m_BuildMode == StructuralBuildMode::TPMSSurface)
+    {
+        const char *tpmsNames[] = {"Gyroid", "Diamond TPMS"};
+        int tpmsIdx = static_cast<int>(m_TPMSType);
+        if (ImGui::Combo("TPMS Unit Cell", &tpmsIdx, tpmsNames, IM_ARRAYSIZE(tpmsNames)))
+        {
+            m_TPMSType = static_cast<StructuralTPMSType>(tpmsIdx);
+            m_NeedRebuild = true;
+        }
+        if (ImGui::SliderFloat("TPMS Thickness", &m_TPMSThickness, 0.02f, 0.45f))
+            m_NeedRebuild = true;
+        if (ImGui::SliderFloat("TPMS Iso", &m_TPMSIsoValue, -0.8f, 0.8f))
+            m_NeedRebuild = true;
+    }
+
+    if (m_BuildMode == StructuralBuildMode::VoronoiStruts ||
+        m_BuildMode == StructuralBuildMode::VoronoiFoam)
+    {
+        if (m_BuildMode == StructuralBuildMode::VoronoiFoam)
+        {
+            if (ImGui::SliderFloat("Voronoi Foam Thickness", &m_VoronoiThickness, 0.02f, 0.35f))
+                m_NeedRebuild = true;
+        }
+        if (ImGui::SliderFloat("Voronoi Jitter", &m_VoronoiJitter, 0.0f, 1.0f))
+            m_NeedRebuild = true;
+        if (ImGui::SliderInt("Voronoi Seed", &m_VoronoiSeed, 0, 255))
+            m_NeedRebuild = true;
+        if (m_BuildMode == StructuralBuildMode::VoronoiStruts &&
+            ImGui::SliderInt("Nearest Neighbors", &m_VoronoiNeighborCount, 2, 8))
+            m_NeedRebuild = true;
     }
 
     const char *domainNames[] = {"Box SDF", "Sphere SDF", "Shoe Sole SDF"};
@@ -224,28 +320,39 @@ void StructuralLatticeDemo::OnImGui()
         m_NeedRebuild = true;
     }
 
-    const char *fieldNames[] = {"Uniform", "Boundary Dense", "Vertical Gradient", "Center Dense"};
-    int fieldIdx = static_cast<int>(m_FieldType);
-    if (ImGui::Combo("Thickness Field", &fieldIdx, fieldNames, IM_ARRAYSIZE(fieldNames)))
+    if (isStrutMode(m_BuildMode))
     {
-        m_FieldType = static_cast<StructuralFieldType>(fieldIdx);
-        m_NeedRebuild = true;
+        const char *fieldNames[] = {"Uniform", "Boundary Dense", "Vertical Gradient", "Center Dense"};
+        int fieldIdx = static_cast<int>(m_FieldType);
+        if (ImGui::Combo("Thickness Field", &fieldIdx, fieldNames, IM_ARRAYSIZE(fieldNames)))
+        {
+            m_FieldType = static_cast<StructuralFieldType>(fieldIdx);
+            m_NeedRebuild = true;
+        }
     }
 
     if (ImGui::SliderFloat3("Domain Size", &m_DomainSize.x, 0.8f, 9.0f))
         m_NeedRebuild = true;
     if (ImGui::SliderFloat("Cell Size", &m_CellSize, 0.35f, 1.4f))
         m_NeedRebuild = true;
-    if (ImGui::SliderFloat("Strut Radius", &m_StrutRadius, 0.01f, 0.12f))
-        m_NeedRebuild = true;
-    if (ImGui::SliderFloat("Joint Scale", &m_JointScale, 0.8f, 2.0f))
-        m_NeedRebuild = true;
-    if (ImGui::SliderFloat("Field Strength", &m_FieldStrength, 0.0f, 2.0f))
-        m_NeedRebuild = true;
-    if (ImGui::SliderFloat("Boundary Band", &m_FieldBand, 0.1f, 2.0f))
-        m_NeedRebuild = true;
-    if (ImGui::SliderInt("Max Struts", &m_MaxStruts, 1000, 30000))
-        m_NeedRebuild = true;
+    if (isStrutMode(m_BuildMode))
+    {
+        if (ImGui::SliderFloat("Strut Radius", &m_StrutRadius, 0.01f, 0.12f))
+            m_NeedRebuild = true;
+        if (ImGui::SliderFloat("Joint Scale", &m_JointScale, 0.8f, 2.0f))
+            m_NeedRebuild = true;
+        if (ImGui::SliderFloat("Field Strength", &m_FieldStrength, 0.0f, 2.0f))
+            m_NeedRebuild = true;
+        if (ImGui::SliderFloat("Boundary Band", &m_FieldBand, 0.1f, 2.0f))
+            m_NeedRebuild = true;
+        if (ImGui::SliderInt("Max Struts", &m_MaxStruts, 1000, 30000))
+            m_NeedRebuild = true;
+    }
+    else
+    {
+        if (ImGui::SliderInt("MC Resolution", &m_ImplicitResolution, 48, 160))
+            m_NeedRebuild = true;
+    }
 
     ImGui::Separator();
     if (ImGui::ColorEdit3("Strut Color", m_StrutColor))
@@ -256,17 +363,27 @@ void StructuralLatticeDemo::OnImGui()
         m_NeedRebuild = true;
 
     ImGui::Separator();
-    ImGui::Checkbox("Show Struts", &m_ShowStruts);
-    ImGui::Checkbox("Show Joints", &m_ShowJoints);
+    if (isStrutMode(m_BuildMode))
+    {
+        ImGui::Checkbox("Show Struts", &m_ShowStruts);
+        ImGui::Checkbox("Show Joints", &m_ShowJoints);
+    }
     ImGui::Checkbox("Show Domain", &m_ShowDomain);
     ImGui::Checkbox("Auto Rotate", &m_AutoRotate);
     if (m_AutoRotate)
         ImGui::SliderFloat("Rotation Speed", &m_RotSpeed, 0.0f, 3.0f);
 
     ImGui::Separator();
-    ImGui::Text("Cells: %d  Unit Edges: %d", m_NumCells, m_NumUnitEdges);
-    ImGui::Text("Struts: %d  Joints: %d%s",
-                m_StrutCount, m_JointCount, m_Truncated ? "  (truncated)" : "");
+    if (isStrutMode(m_BuildMode))
+    {
+        ImGui::Text("Cells: %d  Unit Edges: %d", m_NumCells, m_NumUnitEdges);
+        ImGui::Text("Struts: %d  Joints: %d%s",
+                    m_StrutCount, m_JointCount, m_Truncated ? "  (truncated)" : "");
+    }
+    else
+    {
+        ImGui::Text("Implicit: %d tris, %d verts", m_ImplicitTriCount, m_ImplicitVertCount);
+    }
 }
 
 std::vector<StructuralLatticeDemo::CellEdge> StructuralLatticeDemo::BuildUnitCell() const
@@ -461,6 +578,32 @@ bool StructuralLatticeDemo::ClipSegmentToDomain(const glm::vec3 &p0, const glm::
 
 void StructuralLatticeDemo::RebuildLattice()
 {
+    if (m_BuildMode == StructuralBuildMode::GraphStruts)
+    {
+        m_ImplicitMesh.Destroy();
+        m_ImplicitTriCount = 0;
+        m_ImplicitVertCount = 0;
+        RebuildGraphLattice();
+    }
+    else if (m_BuildMode == StructuralBuildMode::VoronoiStruts)
+    {
+        m_ImplicitMesh.Destroy();
+        m_ImplicitTriCount = 0;
+        m_ImplicitVertCount = 0;
+        RebuildVoronoiStruts();
+    }
+    else
+    {
+        m_JointInstances.clear();
+        m_StrutInstances.clear();
+        m_JointCount = 0;
+        m_StrutCount = 0;
+        RebuildImplicitLattice();
+    }
+}
+
+void StructuralLatticeDemo::RebuildGraphLattice()
+{
     m_JointInstances.clear();
     m_StrutInstances.clear();
     m_Truncated = false;
@@ -527,6 +670,194 @@ void StructuralLatticeDemo::RebuildLattice()
     }
 
     UploadInstances();
+    UploadDomainWireframe();
+}
+
+void StructuralLatticeDemo::RebuildVoronoiStruts()
+{
+    m_JointInstances.clear();
+    m_StrutInstances.clear();
+    m_Truncated = false;
+    m_NumUnitEdges = 0;
+
+    glm::vec3 strutCol(m_StrutColor[0], m_StrutColor[1], m_StrutColor[2]);
+    glm::vec3 jointCol(m_JointColor[0], m_JointColor[1], m_JointColor[2]);
+    std::set<std::array<int, 6>> edgeKeys;
+    std::set<std::array<int, 3>> jointKeys;
+
+    auto addJoint = [&](const glm::vec3 &p)
+    {
+        auto key = quantizePoint(p);
+        if (!jointKeys.insert(key).second)
+            return;
+        m_JointInstances.push_back({p, glm::vec3(0.0f), jointCol, RadiusAt(p) * m_JointScale});
+    };
+
+    auto addStrut = [&](const glm::vec3 &a, const glm::vec3 &b)
+    {
+        if (m_StrutInstances.size() >= static_cast<size_t>(m_MaxStruts))
+        {
+            m_Truncated = true;
+            return;
+        }
+
+        auto key = makeEdgeKey(a, b);
+        if (!edgeKeys.insert(key).second)
+            return;
+
+        glm::vec3 mid = (a + b) * 0.5f;
+        m_StrutInstances.push_back({a, b, strutCol, RadiusAt(mid)});
+        addJoint(a);
+        addJoint(b);
+    };
+
+    float cell = std::max(m_CellSize, 0.05f);
+    glm::ivec3 dims(
+        std::max(1, static_cast<int>(std::ceil(m_DomainSize.x / cell))),
+        std::max(1, static_cast<int>(std::ceil(m_DomainSize.y / cell))),
+        std::max(1, static_cast<int>(std::ceil(m_DomainSize.z / cell))));
+    m_NumCells = dims.x * dims.y * dims.z;
+
+    glm::vec3 gridSize = glm::vec3(dims) * cell;
+    glm::vec3 origin = -gridSize * 0.5f;
+    std::vector<glm::vec3> seeds;
+    seeds.reserve(static_cast<size_t>(m_NumCells));
+
+    for (int ix = 0; ix < dims.x; ++ix)
+    for (int iy = 0; iy < dims.y; ++iy)
+    for (int iz = 0; iz < dims.z; ++iz)
+    {
+        glm::vec3 jitter(
+            hashFloat(ix, iy, iz, m_VoronoiSeed, 0) - 0.5f,
+            hashFloat(ix, iy, iz, m_VoronoiSeed, 1) - 0.5f,
+            hashFloat(ix, iy, iz, m_VoronoiSeed, 2) - 0.5f);
+        glm::vec3 p = origin + (glm::vec3(ix, iy, iz) + glm::vec3(0.5f)) * cell
+                    + jitter * (m_VoronoiJitter * cell * 0.65f);
+        if (DomainSDF(p) <= 0.0f)
+            seeds.push_back(p);
+    }
+
+    float maxDist = cell * 1.9f;
+    for (size_t i = 0; i < seeds.size() && !m_Truncated; ++i)
+    {
+        std::vector<std::pair<float, size_t>> neighbors;
+        neighbors.reserve(seeds.size());
+        for (size_t j = 0; j < seeds.size(); ++j)
+        {
+            if (i == j)
+                continue;
+            float d = glm::length(seeds[j] - seeds[i]);
+            if (d <= maxDist)
+                neighbors.push_back({d, j});
+        }
+
+        std::sort(neighbors.begin(), neighbors.end(),
+                  [](const auto &a, const auto &b) { return a.first < b.first; });
+
+        int n = std::min(m_VoronoiNeighborCount, static_cast<int>(neighbors.size()));
+        for (int k = 0; k < n; ++k)
+        {
+            glm::vec3 clippedA, clippedB;
+            if (ClipSegmentToDomain(seeds[i], seeds[neighbors[k].second], clippedA, clippedB))
+                addStrut(clippedA, clippedB);
+            if (m_Truncated)
+                break;
+        }
+    }
+
+    m_NumUnitEdges = m_VoronoiNeighborCount;
+    UploadInstances();
+    UploadDomainWireframe();
+}
+
+float StructuralLatticeDemo::TPMSField(const glm::vec3 &p) const
+{
+    float k = 6.2831853f / std::max(m_CellSize, 0.001f);
+    float x = p.x * k;
+    float y = p.y * k;
+    float z = p.z * k;
+
+    if (m_TPMSType == StructuralTPMSType::Gyroid)
+        return std::sin(x) * std::cos(y) + std::sin(y) * std::cos(z) + std::sin(z) * std::cos(x);
+
+    return std::sin(x) * std::sin(y) * std::sin(z)
+         + std::sin(x) * std::cos(y) * std::cos(z)
+         + std::cos(x) * std::sin(y) * std::cos(z)
+         + std::cos(x) * std::cos(y) * std::sin(z);
+}
+
+float StructuralLatticeDemo::TPMSLatticeSDF(const glm::vec3 &p) const
+{
+    return std::abs(TPMSField(p) - m_TPMSIsoValue) - m_TPMSThickness;
+}
+
+float StructuralLatticeDemo::VoronoiLatticeSDF(const glm::vec3 &p) const
+{
+    float gx = p.x / std::max(m_CellSize, 0.001f);
+    float gy = p.y / std::max(m_CellSize, 0.001f);
+    float gz = p.z / std::max(m_CellSize, 0.001f);
+    int cx = static_cast<int>(std::floor(gx));
+    int cy = static_cast<int>(std::floor(gy));
+    int cz = static_cast<int>(std::floor(gz));
+
+    float d1 = 1e10f;
+    float d2 = 1e10f;
+    for (int dz = -1; dz <= 1; ++dz)
+    for (int dy = -1; dy <= 1; ++dy)
+    for (int dx = -1; dx <= 1; ++dx)
+    {
+        int nx = cx + dx;
+        int ny = cy + dy;
+        int nz = cz + dz;
+        glm::vec3 seed(
+            static_cast<float>(nx) + 0.5f + (hashFloat(nx, ny, nz, m_VoronoiSeed, 0) - 0.5f) * m_VoronoiJitter,
+            static_cast<float>(ny) + 0.5f + (hashFloat(nx, ny, nz, m_VoronoiSeed, 1) - 0.5f) * m_VoronoiJitter,
+            static_cast<float>(nz) + 0.5f + (hashFloat(nx, ny, nz, m_VoronoiSeed, 2) - 0.5f) * m_VoronoiJitter);
+        glm::vec3 d = glm::vec3(gx, gy, gz) - seed;
+        float dist = glm::length(d) * m_CellSize;
+        if (dist < d1)
+        {
+            d2 = d1;
+            d1 = dist;
+        }
+        else if (dist < d2)
+        {
+            d2 = dist;
+        }
+    }
+
+    return (d2 - d1) - m_VoronoiThickness;
+}
+
+void StructuralLatticeDemo::RebuildImplicitLattice()
+{
+    float margin = std::max({m_TPMSThickness, m_VoronoiThickness, 0.05f}) + 0.1f;
+    glm::vec3 half = m_DomainSize * 0.5f + glm::vec3(margin);
+
+    auto sdf = [&](float x, float y, float z) -> float
+    {
+        glm::vec3 p(x, y, z);
+        float lattice = (m_BuildMode == StructuralBuildMode::TPMSSurface)
+                            ? TPMSLatticeSDF(p)
+                            : VoronoiLatticeSDF(p);
+        return std::max(DomainSDF(p), lattice);
+    };
+
+    auto result = MarchingCubes::Extract(sdf, -half, half, m_ImplicitResolution, 0.0f);
+    m_ImplicitTriCount = static_cast<int>(result.indices.size() / 3);
+    m_ImplicitVertCount = static_cast<int>(result.vertices.size());
+
+    if (result.vertices.empty())
+    {
+        m_ImplicitMesh.Destroy();
+    }
+    else
+    {
+        m_ImplicitMesh.Upload(
+            reinterpret_cast<const std::vector<MeshRenderer::MCVertex> &>(result.vertices),
+            result.indices);
+    }
+
     UploadDomainWireframe();
 }
 
@@ -622,4 +953,5 @@ void StructuralLatticeDemo::UploadDomainWireframe()
 void StructuralLatticeDemo::RegisterShaders(ShaderHotReload &hotReload)
 {
     hotReload.Watch(&m_Shader);
+    hotReload.Watch(&m_SurfaceShader);
 }
