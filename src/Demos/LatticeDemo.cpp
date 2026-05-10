@@ -16,12 +16,45 @@ static void SetupInstanceAttributes(GLuint instanceVBO)
     glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
     for (int i = 0; i < 3; i++)
     {
+        // 通道 (2+i) 的数据每次读 3 个 float (vec3)
+        // 跨度是 3个vec3的长度，偏移量是 i个vec3 的长度
         glVertexAttribPointer(2 + i, 3, GL_FLOAT, GL_FALSE,
                               3 * sizeof(glm::vec3),
                               (void *)(i * sizeof(glm::vec3)));
         glEnableVertexAttribArray(2 + i);
+        // 默认情况下（Divisor = 0），显卡每画一个顶点，通道里的数据跳到下一个。
+        // 设置为 1 后，显卡每画完一个实例（一整个球体，包含几百个顶点），通道里的数据才跳到下一个。
         glVertexAttribDivisor(2 + i, 1); // 每实例
     }
+}
+
+static void GetHcpBasis(float a, glm::vec3 &e1, glm::vec3 &e2, glm::vec3 &e3)
+{
+    constexpr float sqrt3Over2 = 0.8660254f;
+    constexpr float cOverA = 1.633f;
+
+    e1 = glm::vec3(a, 0.0f, 0.0f);
+    e2 = glm::vec3(0.5f * a, 0.0f, sqrt3Over2 * a);
+    e3 = glm::vec3(0.0f, cOverA * a, 0.0f);
+}
+
+static glm::vec3 GetLatticeCenter(LatticeType type, int repeatX, int repeatY, int repeatZ, float a)
+{
+    if (type == LatticeType::Hexagonal)
+    {
+        glm::vec3 e1, e2, e3;
+        GetHcpBasis(a, e1, e2, e3);
+        glm::vec3 bOffset = (e1 + e2) / 3.0f + e3 * 0.5f;
+        glm::vec3 maxCorner = float(repeatX - 1) * e1
+                            + float(repeatZ - 1) * e2
+                            + float(repeatY - 1) * e3
+                            + bOffset;
+        return maxCorner * 0.5f;
+    }
+
+    return glm::vec3((repeatX - 1) * a * 0.5f,
+                     (repeatY - 1) * a * 0.5f,
+                     (repeatZ - 1) * a * 0.5f);
 }
 
 void LatticeDemo::OnInit()
@@ -33,7 +66,9 @@ void LatticeDemo::OnInit()
     {
         std::vector<float> verts;
         std::vector<unsigned int> indices;
+        // 生成半径为1.0，经度切分为16，纬度切分为12的标准球体
         GenerateSphere(verts, indices, 1.0f, 16, 12);
+        // 记录索引的数量，这在后续调用 glDrawElements 时需要用到
         m_SphereIndexCount = static_cast<int>(indices.size());
 
         glGenVertexArrays(1, &m_AtomVAO);
@@ -45,11 +80,12 @@ void LatticeDemo::OnInit()
 
         glBindBuffer(GL_ARRAY_BUFFER, m_AtomVBO);
         glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), verts.data(), GL_STATIC_DRAW);
+        // 数据结构推断为每 6 个 float 为一组：[Px, Py, Pz, Nx, Ny, Nz]
         // loc0 = position, loc1 = normal
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
-        glEnableVertexAttribArray(0);
+        glEnableVertexAttribArray(0); // 顶点位置
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)(3 * sizeof(float)));
-        glEnableVertexAttribArray(1);
+        glEnableVertexAttribArray(1); // 法线向量
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_AtomEBO);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
@@ -135,11 +171,9 @@ void LatticeDemo::OnRender(const ICamera &camera, float aspectRatio)
 
     // 居中晶格
     glm::mat4 model(1.0f);
-    float cx = (m_RepeatX - 1) * m_LatticeConstant * 0.5f;
-    float cy = (m_RepeatY - 1) * m_LatticeConstant * 0.5f;
-    float cz = (m_RepeatZ - 1) * m_LatticeConstant * 0.5f;
+    glm::vec3 center = GetLatticeCenter(m_LatticeType, m_RepeatX, m_RepeatY, m_RepeatZ, m_LatticeConstant);
     model = glm::rotate(model, m_RotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
-    model = glm::translate(model, glm::vec3(-cx, -cy, -cz));
+    model = glm::translate(model, -center);
 
     m_Shader.SetMat4("u_Model", model);
     m_Shader.SetMat4("u_View", camera.GetViewMatrix());
@@ -258,10 +292,11 @@ void LatticeDemo::RebuildLattice()
 
         case LatticeType::Hexagonal:
         {
-            float c = a * 1.633f;
-            atoms.push_back({o, col1});
-            atoms.push_back({o + glm::vec3(a * 0.5f, 0.0f, a * 0.289f), col1});
-            atoms.push_back({o + glm::vec3(a * 0.25f, c * 0.5f, a * 0.144f), col2});
+            glm::vec3 e1, e2, e3;
+            GetHcpBasis(a, e1, e2, e3);
+            glm::vec3 hcpO = float(ix) * e1 + float(iz) * e2 + float(iy) * e3;
+            atoms.push_back({hcpO, col1});
+            atoms.push_back({hcpO + (e1 + e2) / 3.0f + e3 * 0.5f, col2});
             break;
         }
 
@@ -292,7 +327,7 @@ void LatticeDemo::RebuildLattice()
     case LatticeType::SimpleCubic:   nn = a; break;
     case LatticeType::BodyCentered:  nn = a * 0.866f; break;
     case LatticeType::FaceCentered:  nn = a * 0.7071f; break;
-    case LatticeType::Hexagonal:     nn = a * 0.5f; break;
+    case LatticeType::Hexagonal:     nn = a; break;
     case LatticeType::Diamond:       nn = a * 0.433f; break;
     }
 
@@ -344,12 +379,8 @@ void LatticeDemo::UploadCellMesh()
         verts.insert(verts.end(), {p1.x, p1.y, p1.z, cc.r, cc.g, cc.b});
     };
 
-    for (int ix = 0; ix < m_RepeatX; ix++)
-    for (int iy = 0; iy < m_RepeatY; iy++)
-    for (int iz = 0; iz < m_RepeatZ; iz++)
+    auto addCell = [&](glm::vec3 o, glm::vec3 dx, glm::vec3 dy, glm::vec3 dz)
     {
-        glm::vec3 o(ix * a, iy * a, iz * a);
-        glm::vec3 dx(a, 0, 0), dy(0, a, 0), dz(0, 0, a);
         addLine(o, o + dx);           addLine(o, o + dy);           addLine(o, o + dz);
         addLine(o + dx, o + dx + dy); addLine(o + dx, o + dx + dz);
         addLine(o + dy, o + dy + dx); addLine(o + dy, o + dy + dz);
@@ -357,6 +388,25 @@ void LatticeDemo::UploadCellMesh()
         addLine(o + dx + dy, o + dx + dy + dz);
         addLine(o + dx + dz, o + dx + dy + dz);
         addLine(o + dy + dz, o + dx + dy + dz);
+    };
+
+    for (int ix = 0; ix < m_RepeatX; ix++)
+    for (int iy = 0; iy < m_RepeatY; iy++)
+    for (int iz = 0; iz < m_RepeatZ; iz++)
+    {
+        if (m_LatticeType == LatticeType::Hexagonal)
+        {
+            glm::vec3 e1, e2, e3;
+            GetHcpBasis(a, e1, e2, e3);
+            glm::vec3 o = float(ix) * e1 + float(iz) * e2 + float(iy) * e3;
+            addCell(o, e1, e3, e2);
+        }
+        else
+        {
+            glm::vec3 o(ix * a, iy * a, iz * a);
+            glm::vec3 dx(a, 0, 0), dy(0, a, 0), dz(0, 0, a);
+            addCell(o, dx, dy, dz);
+        }
     }
 
     m_CellVertexCount = static_cast<int>(verts.size() / 6);
