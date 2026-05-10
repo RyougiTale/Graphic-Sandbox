@@ -5,6 +5,7 @@
 #include "Demos/TriangleDemo.h"
 #include "Demos/ComputeDemo.h"
 #include "Demos/LatticeDemo.h"
+#include "Demos/StructuralLatticeDemo.h"
 #include "Demos/TPMSDemo.h"
 #include "Demos/SDFLatticeDemo.h"
 #include "Demos/VoronoiLatticeDemo.h"
@@ -48,6 +49,7 @@ void Application::Init()
     m_DemoManager.Register<TriangleDemo>();
     m_DemoManager.Register<ComputeDemo>();
     m_DemoManager.Register<LatticeDemo>();
+    m_DemoManager.Register<StructuralLatticeDemo>();
     m_DemoManager.Register<TPMSDemo>();
     m_DemoManager.Register<SDFLatticeDemo>();
     m_DemoManager.Register<VoronoiLatticeDemo>();
