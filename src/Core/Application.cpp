@@ -83,7 +83,7 @@ void Application::MainLoop()
     // deltaTime CPU测的耗时
     float delta = m_Timer.GetDeltaTime();
     // imgui的focus判断
-    if (!m_ImGui.WantCaptureMouse() && !m_ImGui.WantCaptureKeyboard())
+    if (!m_ImGui.WantCaptureMouse() || m_Window.IsMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT))
     {
         m_Camera.Update(delta, m_Window);
     }

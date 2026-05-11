@@ -30,6 +30,7 @@ public:
     float moveSpeed = 15.0f;
     float sprintMultiplier = 2.0f;
     float mouseSensitivity = 0.15f;
+    float zoomSpeed = 1.5f;
     float fov = 60.0f;
     float nearPlane = 0.1f;
     float farPlane = 1000.0f;

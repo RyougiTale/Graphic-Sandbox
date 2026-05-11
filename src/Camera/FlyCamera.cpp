@@ -81,12 +81,10 @@ void FlyCamera::Update(float deltaTime, Window &window)
 }
 
 // yoffset glfw的滚轮回调
-// 速度增加或减少0.5/per
+// 沿当前视线方向推进/后退
 void FlyCamera::OnScroll(double yoffset)
 {
-    moveSpeed += static_cast<float>(yoffset) * 0.5f;
-    // clamp: 限制在一个范围
-    moveSpeed = std::clamp(moveSpeed, 0.5f, 50.0f);
+    position += m_Front * static_cast<float>(yoffset) * zoomSpeed;
 }
 
 // 用于改变世界(World Space 转化到 View Space)
@@ -126,6 +124,7 @@ void FlyCamera::RenderImGui()
     ImGui::Separator();
     ImGui::SliderFloat("Move Speed", &moveSpeed, 0.5f, 50.0f);
     ImGui::SliderFloat("Mouse Sensitivity", &mouseSensitivity, 0.01f, 1.0f);
+    ImGui::SliderFloat("Scroll Zoom Speed", &zoomSpeed, 0.1f, 10.0f);
     ImGui::SliderFloat("FOV", &fov, 30.0f, 120.0f);
     ImGui::Separator();
     if (ImGui::Button("Reset"))
@@ -135,6 +134,7 @@ void FlyCamera::RenderImGui()
         pitch = 0.0f;
         moveSpeed = 15.0f;
         mouseSensitivity = 0.15f;
+        zoomSpeed = 1.5f;
         fov = 60.0f;
         UpdateVectors();
     }
